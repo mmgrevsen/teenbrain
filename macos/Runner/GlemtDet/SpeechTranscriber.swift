@@ -35,6 +35,12 @@ final class SpeechTranscriber: NSObject, SFSpeechRecognizerDelegate {
 
   private(set) var isRunning = false
 
+  /// Consecutive failed restarts. Reset by every completed utterance.
+  private var restartCount = 0
+
+  /// Enough to ride out a transient failure, few enough to not spin forever.
+  private static let maxRestarts = 3
+
   // MARK: - Permissions
 
   /// Microphone and speech recognition are separate grants, and the UI has to
@@ -106,16 +112,6 @@ final class SpeechTranscriber: NSObject, SFSpeechRecognizerDelegate {
     recognizer.delegate = self
     self.recognizer = recognizer
 
-    let request = SFSpeechAudioBufferRecognitionRequest()
-    request.shouldReportPartialResults = true
-    request.requiresOnDeviceRecognition = true
-    // Punctuation makes the transcript usable as note material rather than as
-    // one long breathless sentence.
-    if #available(macOS 13.0, *) {
-      request.addsPunctuation = true
-    }
-    self.request = request
-
     let input = engine.inputNode
     let format = input.outputFormat(forBus: 0)
     guard format.channelCount > 0, format.sampleRate > 0 else {
@@ -127,8 +123,43 @@ final class SpeechTranscriber: NSObject, SFSpeechRecognizerDelegate {
       self?.request?.append(buffer)
     }
 
+    isRunning = true
+    restartCount = 0
+    beginTask()
+
+    engine.prepare()
+    do {
+      try engine.start()
+    } catch {
+      teardown()
+      throw Failure(code: "noInput", message: "Kunne ikke starte lydoptagelsen: \(error.localizedDescription)")
+    }
+  }
+
+  /// Starts one recognition task.
+  ///
+  /// `SFSpeechRecognizer` finalises per *utterance*, not per session: after a
+  /// natural pause — and in any case after about a minute — it marks a result
+  /// final and that task is finished. Continuous dictation therefore means
+  /// keeping the audio engine and its tap running and starting a fresh task
+  /// each time, which is what `handleFinal` does. Tearing the whole session
+  /// down on the first final result is what made a minute of speech come out
+  /// as four words.
+  private func beginTask() {
+    guard isRunning, let recognizer else { return }
+
+    let request = SFSpeechAudioBufferRecognitionRequest()
+    request.shouldReportPartialResults = true
+    request.requiresOnDeviceRecognition = true
+    // Punctuation makes the transcript usable as note material rather than as
+    // one long breathless sentence.
+    if #available(macOS 13.0, *) {
+      request.addsPunctuation = true
+    }
+    self.request = request
+
     task = recognizer.recognitionTask(with: request) { [weak self] result, error in
-      guard let self else { return }
+      guard let self, self.isRunning else { return }
 
       if let result {
         let segments = result.bestTranscription.segments
@@ -142,32 +173,47 @@ final class SpeechTranscriber: NSObject, SFSpeechRecognizerDelegate {
           text: result.bestTranscription.formattedString,
           isFinal: result.isFinal,
           confidence: confidence))
-      }
 
-      if error != nil || (result?.isFinal ?? false) {
-        // A recogniser that ends on its own (silence, a time limit, an error)
-        // has to tell Dart, or the UI sits there showing a live indicator for
-        // a session that is over.
-        let wasRunning = self.isRunning
-        self.teardown()
-        if wasRunning {
-          if let error, !(result?.isFinal ?? false) {
-            self.onError?("failed", error.localizedDescription)
-          }
-          self.onStopped?()
+        if result.isFinal {
+          self.handleFinal()
+          return
         }
       }
+
+      if let error {
+        self.handleError(error)
+      }
+    }
+  }
+
+  /// One utterance ended. Start listening for the next one.
+  private func handleFinal() {
+    guard isRunning else { return }
+    request?.endAudio()
+    task = nil
+    request = nil
+    restartCount = 0
+    beginTask()
+  }
+
+  /// A task failed. Retry a few times before giving up — a recogniser that
+  /// hiccups mid-lesson should not end the session, but one that cannot run at
+  /// all must say so rather than spin.
+  private func handleError(_ error: Error) {
+    guard isRunning else { return }
+    task = nil
+    request = nil
+
+    restartCount += 1
+    if restartCount <= Self.maxRestarts {
+      beginTask()
+      return
     }
 
-    engine.prepare()
-    do {
-      try engine.start()
-    } catch {
-      teardown()
-      throw Failure(code: "noInput", message: "Kunne ikke starte lydoptagelsen: \(error.localizedDescription)")
-    }
-
-    isRunning = true
+    let message = error.localizedDescription
+    teardown()
+    onError?("failed", message)
+    onStopped?()
   }
 
   func stop() {

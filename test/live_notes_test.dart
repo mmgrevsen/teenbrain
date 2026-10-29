@@ -209,6 +209,30 @@ void main() {
       expect(service.state.committed, 'Revolutionen begyndte i 1789.');
     });
 
+    test('en hel time er mange ytringer, ikke én', () async {
+      // Genkenderen markerer isFinal efter hver pause i talen, ikke når
+      // sessionen slutter. Fejlen var at behandle den første isFinal som
+      // "færdig" — en hel undervisningstime kom ud som fire ord.
+      await service.start();
+
+      fake.hear('Revolutionen begyndte i 1789.', isFinal: true);
+      await settle();
+      fake.hear('Louis den Sekstende blev henrettet.', isFinal: true);
+      await settle();
+      fake.hear('Derefter kom rædselsherredømmet.', isFinal: true);
+      await settle();
+      fake.hear('Og til sidst');
+      await settle();
+
+      expect(
+        service.state.transcript,
+        'Revolutionen begyndte i 1789. Louis den Sekstende blev henrettet. '
+        'Derefter kom rædselsherredømmet. Og til sidst',
+      );
+      expect(service.state.isListening, isTrue, reason: 'sessionen må ikke stoppe');
+      expect(service.state.wordCount, 15);
+    });
+
     test('tomme segmenter ignoreres', () async {
       await service.start();
       fake.hear('   ');
