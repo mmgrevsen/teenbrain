@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- TeenBrain talks to the Anthropic API and nothing else. This is a real
+	     change from GlemtDet, which had no network capability at all, and it is
+	     stated plainly on the app's Privacy page. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- Retained for GlemtDet's visual memory, which still builds. -->
+	<!-- Live Notes. Talegenkendelsen kører lokalt (requiresOnDeviceRecognition),
+	     så lyden forlader ikke maskinen. Slået fra i appen som standard. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<key>com.apple.security.device.camera</key>
+	<true/>
+	<!-- Only so "Eksportér data" can write the JSON the user asked for. -->
+	<key>com.apple.security.files.downloads.read-write</key>
+	<true/>
+</dict>
+</plist>

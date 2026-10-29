@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIconFile</key>
+	<string></string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>TeenBrain bruger mikrofonen til Live Notes, så undervisning kan blive til strukturerede noter. Lyden bliver genkendt lokalt på denne computer og sendes ikke nogen steder hen. Funktionen er slået fra, indtil du selv starter den.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>TeenBrain bruger macOS' egen talegenkendelse til at lave noter ud af det, der bliver sagt. Genkendelsen sker lokalt på computeren.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>GlemtDet bruger kameraet til at genkende dine ting, så appen kan huske hvor du har lagt dem. Alt bliver analyseret og gemt lokalt på denne computer.</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>$(PRODUCT_COPYRIGHT)</string>
+	<key>NSMainNibFile</key>
+	<string>MainMenu</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+</dict>
+</plist>

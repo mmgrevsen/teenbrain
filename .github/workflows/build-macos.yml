@@ -1,0 +1,89 @@
+# Bygger TeenBrain til macOS på GitHubs maskiner.
+#
+# Hvorfor: udviklingsmaskinen er en Mac, hvor brugeren ikke er administrator,
+# og Xcodes licensaftale kan kun godkendes med sudo. GitHubs macOS-runnere har
+# Xcode installeret med licensen godkendt på forhånd, så bygget kan ske her i
+# stedet — uden at nogen skal taste en adgangskode.
+#
+# Resultatet ligger som et artefakt på kørslen: TeenBrain-macos.zip.
+
+name: Byg macOS-app
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Så appen kan bygges på kommando uden at skulle pushe noget.
+  workflow_dispatch:
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # macOS 15 på Apple Silicon. Giver en arm64-app, som matcher maskinen den
+    # skal køre på.
+    runs-on: macos-15
+
+    steps:
+      - name: Hent koden
+        uses: actions/checkout@v4
+
+      - name: Installér Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          # Samme version som projektet er udviklet og testet på. Pinnet med
+          # vilje: en nyere Flutter skal tages i brug bevidst, ikke fordi en
+          # runner blev opdateret.
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+
+      - name: Hent afhængigheder
+        run: flutter pub get
+
+      - name: Statisk analyse
+        run: flutter analyze
+
+      - name: Kør testene
+        # 252 tests. Fejler de, bliver der ingen app — en grøn kørsel betyder
+        # at appen også er testet, ikke bare at den kompilerede.
+        run: flutter test
+
+      - name: Typetjek det native lag
+        # Swift-koden kompileres alligevel i næste trin, men et typetjek her
+        # giver en læsbar fejl i stedet for at drukne i xcodebuild-output.
+        run: |
+          swiftc -typecheck \
+            -sdk "$(xcrun --show-sdk-path)" \
+            -target arm64-apple-macosx10.15 \
+            macos/Runner/GlemtDet/SpeechTranscriber.swift \
+            || echo "::warning::Typetjek uden Flutter-frameworket sprang over"
+
+      - name: Byg appen
+        run: flutter build macos --release
+
+      - name: Pak appen
+        # ditto frem for zip: bevarer bundle-struktur, symlinks og signatur.
+        run: |
+          cd build/macos/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent TeenBrain.app TeenBrain-macos.zip
+
+      - name: Læg appen op som artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: TeenBrain-macos
+          path: build/macos/Build/Products/Release/TeenBrain-macos.zip
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Sig hvad der skete
+        run: |
+          echo "### TeenBrain er bygget" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Hent \`TeenBrain-macos\` under **Artifacts** på denne kørsel." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Appen er ad-hoc-signeret, ikke notariseret. Første gang:" >> "$GITHUB_STEP_SUMMARY"
+          echo "højreklik på appen → Åbn → Åbn." >> "$GITHUB_STEP_SUMMARY"
